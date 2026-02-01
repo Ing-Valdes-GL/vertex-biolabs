@@ -313,7 +313,7 @@ export default function ChatPage() {
                               src={message.file_url} 
                               alt="Attachment" 
                               className="rounded-lg mb-2 max-w-full cursor-pointer hover:opacity-90 transition"
-                             onClick={() => message.file_url && window.open(message.file_url, '_blank')}
+                           onClick={() => message.file_url && window.open(message.file_url, '_blank')}
                             />
                           </div>
                         )}
