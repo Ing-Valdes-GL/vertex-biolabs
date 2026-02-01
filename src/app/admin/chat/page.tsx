@@ -398,7 +398,7 @@ export default function AdminChatPage() {
                                 src={message.file_url} 
                                 alt="Image" 
                                 className="rounded-lg max-h-60 object-contain cursor-pointer bg-black/10"
-                                onClick={() => window.open(message.file_url, '_blank')}
+                               onClick={() => message.file_url && window.open(message.file_url, '_blank')}
                               />
                             ) : (
                               <p className="break-words">{message.content}</p>
