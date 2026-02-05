@@ -196,11 +196,11 @@ export default function ProductsPage() {
                       <div>
                         {product.has_promotion && (
                           <span className="text-gray-400 line-through text-sm mr-2">
-                            ${product.price.toFixed(2)}
+                            £{product.price.toFixed(2)}
                           </span>
                         )}
                         <span className={`text-2xl font-bold ${product.has_promotion ? 'text-green-600' : theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                          ${finalPrice.toFixed(2)}
+                          £{finalPrice.toFixed(2)}
                         </span>
                       </div>
                     </div>
@@ -274,11 +274,11 @@ export default function ProductsPage() {
                     <div className="flex items-baseline space-x-3 mb-2">
                       {selectedProduct.has_promotion && (
                         <span className="text-gray-400 line-through text-xl">
-                          ${selectedProduct.price.toFixed(2)}
+                          £{selectedProduct.price.toFixed(2)}
                         </span>
                       )}
                       <span className={`text-4xl font-bold ${selectedProduct.has_promotion ? 'text-green-600' : theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                        ${(selectedProduct.has_promotion
+                        £{(selectedProduct.has_promotion
                           ? selectedProduct.price * (1 - selectedProduct.promotion_percentage / 100)
                           : selectedProduct.price).toFixed(2)}
                       </span>
