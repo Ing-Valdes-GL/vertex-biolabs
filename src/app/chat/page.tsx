@@ -34,7 +34,7 @@ export default function ChatPage() {
     if (user && conversation) {
       loadMessages()
       const unsubscribe = subscribeToRealtime()
-      markMessagesAsRead() // Lire les messages quand on ouvre le chat
+      markMessagesAsRead()
       return () => {
         unsubscribe?.()
       }
@@ -173,7 +173,7 @@ export default function ChatPage() {
         .eq('id', conversation.id)
     } catch (error) {
       setNewMessage(content)
-      alert('Erreur d\'envoi')
+      alert('Failed to send message')
     } finally {
       setSending(false)
     }
@@ -200,11 +200,11 @@ export default function ChatPage() {
         sender_id: user.id,
         message_type: 'image',
         file_url: publicUrl,
-        content: 'Image envoyée',
+        content: 'Image sent',
         is_read: false
       })
     } catch (error: any) {
-      alert(`Erreur: ${error.message}`)
+      alert(`Error: ${error.message}`)
     } finally {
       setUploading(false)
     }
@@ -221,7 +221,7 @@ export default function ChatPage() {
       <main className="container mx-auto px-4 py-6 flex-1 flex flex-col max-w-4xl">
         <div className={`flex-1 flex flex-col rounded-2xl shadow-2xl overflow-hidden border ${theme === 'dark' ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
           
-          {/* Header du Chat */}
+          {/* Chat Header */}
           <div className={`p-4 border-b flex items-center justify-between ${theme === 'dark' ? 'bg-gray-900/50 border-gray-800' : 'bg-gray-50 border-gray-100'}`}>
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white shadow-lg">
@@ -237,7 +237,7 @@ export default function ChatPage() {
             </div>
           </div>
 
-          {/* Zone des Messages */}
+          {/* Messages Area */}
           <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
             {loading ? (
               <div className="h-full flex flex-col items-center justify-center space-y-4">
@@ -250,9 +250,9 @@ export default function ChatPage() {
                   <Info className="text-blue-600" size={32} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg">Bienvenue sur le support</h3>
+                  <h3 className="font-bold text-lg">Welcome to Support</h3>
                   <p className="text-sm text-gray-500 max-w-xs mx-auto">
-                    Posez vos questions ici. Nos experts Vertex Biolabs vous répondront dans les plus brefs délais.
+                    Ask your questions here. Our Vertex Biolabs experts will get back to you as soon as possible.
                   </p>
                 </div>
               </div>
@@ -308,7 +308,7 @@ export default function ChatPage() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Zone de saisie */}
+          {/* Input Area */}
           <div className={`p-4 border-t ${theme === 'dark' ? 'border-gray-800 bg-gray-900' : 'border-gray-100 bg-white'}`}>
             <div className="flex items-end space-x-2">
               <input
@@ -343,7 +343,7 @@ export default function ChatPage() {
                       sendMessage()
                     }
                   }}
-                  placeholder="Écrivez votre message..."
+                  placeholder="Type your message..."
                   rows={1}
                   className="w-full bg-transparent border-none focus:ring-0 p-3 text-sm resize-none max-h-32"
                 />
