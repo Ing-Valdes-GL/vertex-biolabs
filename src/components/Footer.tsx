@@ -56,7 +56,7 @@ export default function Footer() {
               </a>
             </div>
             <div className={`px-4 py-1 rounded-full text-xs font-medium ${theme === 'dark' ? 'bg-gray-800 text-gray-400' : 'bg-gray-700 text-gray-300'}`}>
-              Support: +237 692 118 391
+              Contact external support.
             </div>
           </div>
         </div>
