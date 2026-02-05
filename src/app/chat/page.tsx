@@ -6,7 +6,7 @@ import { supabase, ChatMessage, ChatConversation } from '@/lib/supabase'
 import { useTheme } from '@/components/ThemeProvider'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
-import { Send, Image as ImageIcon, Mic, Paperclip, Check, CheckCheck } from 'lucide-react'
+import { Send, Paperclip, Check, CheckCheck, Loader2, Info } from 'lucide-react'
 
 export const dynamic = 'force-dynamic';
 
@@ -19,7 +19,7 @@ export default function ChatPage() {
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
-  const [isTyping, setIsTyping] = useState(false) // State for "Support is typing..."
+  const [isTyping, setIsTyping] = useState(false)
   const [uploading, setUploading] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -34,6 +34,7 @@ export default function ChatPage() {
     if (user && conversation) {
       loadMessages()
       const unsubscribe = subscribeToRealtime()
+      markMessagesAsRead() // Lire les messages quand on ouvre le chat
       return () => {
         unsubscribe?.()
       }
@@ -56,7 +57,6 @@ export default function ChatPage() {
 
   const loadOrCreateConversation = async (userId: string) => {
     try {
-      // Fetch the most recent active conversation to ensure we don't get duplicates errors
       const { data: existing } = await supabase
         .from('chat_conversations')
         .select('*')
@@ -69,7 +69,6 @@ export default function ChatPage() {
       if (existing) {
         setConversation(existing)
       } else {
-        // Create new conversation if none exists
         const { data: newConv, error } = await supabase
           .from('chat_conversations')
           .insert({
@@ -84,7 +83,7 @@ export default function ChatPage() {
         setConversation(newConv)
       }
     } catch (error) {
-      console.error('Error loading conversation:', error)
+      console.error('Error:', error)
     } finally {
       setLoading(false)
     }
@@ -92,31 +91,30 @@ export default function ChatPage() {
 
   const loadMessages = async () => {
     if (!conversation) return
+    const { data } = await supabase
+      .from('chat_messages')
+      .select('*')
+      .eq('conversation_id', conversation.id)
+      .order('created_at', { ascending: true })
+    
+    if (data) setMessages(data)
+  }
 
-    try {
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .select('*')
-        .eq('conversation_id', conversation.id)
-        .order('created_at', { ascending: true })
-
-      if (error) throw error
-      setMessages(data || [])
-    } catch (error) {
-      console.error('Error loading messages:', error)
-    }
+  const markMessagesAsRead = async () => {
+    if (!conversation || !user) return
+    await supabase
+      .from('chat_messages')
+      .update({ is_read: true })
+      .eq('conversation_id', conversation.id)
+      .neq('sender_id', user.id)
+      .eq('is_read', false)
   }
 
   const subscribeToRealtime = () => {
     if (!conversation || !user) return
 
     const channel = supabase.channel(`chat:${conversation.id}`)
-
-    channel
-      // 1. Listen for new messages (INSERT)
-      .on(
-        'postgres_changes',
-        {
+      .on('postgres_changes', {
           event: 'INSERT',
           schema: 'public',
           table: 'chat_messages',
@@ -124,43 +122,31 @@ export default function ChatPage() {
         },
         (payload) => {
           const newMsg = payload.new as ChatMessage
-          // Avoid duplicate messages if optimistic UI was used (not the case here but good practice)
           setMessages((current) => {
             if (current.find(m => m.id === newMsg.id)) return current
             return [...current, newMsg]
           })
-          
-          // If message is from others, stop typing indicator
           if (newMsg.sender_id !== user.id) {
             setIsTyping(false)
+            markMessagesAsRead()
           }
         }
       )
-      // 2. Listen for Typing Indicators (Broadcast)
-      .on(
-        'broadcast',
-        { event: 'typing' },
-        (payload) => {
-          if (payload.payload.userId !== user.id) {
-            setIsTyping(true)
-            // Auto-hide after 3 seconds of inactivity
-            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
-            typingTimeoutRef.current = setTimeout(() => setIsTyping(false), 3000)
-          }
+      .on('broadcast', { event: 'typing' }, (payload) => {
+        if (payload.payload.userId !== user.id) {
+          setIsTyping(true)
+          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+          typingTimeoutRef.current = setTimeout(() => setIsTyping(false), 3000)
         }
-      )
+      })
       .subscribe()
 
-    return () => {
-      supabase.removeChannel(channel)
-    }
+    return () => { supabase.removeChannel(channel) }
   }
 
-  // Send "I am typing" event
   const sendTypingEvent = async () => {
     if (!conversation || !user) return
-    const channel = supabase.channel(`chat:${conversation.id}`)
-    await channel.send({
+    supabase.channel(`chat:${conversation.id}`).send({
       type: 'broadcast',
       event: 'typing',
       payload: { userId: user.id }
@@ -169,34 +155,25 @@ export default function ChatPage() {
 
   const sendMessage = async () => {
     if (!newMessage.trim() || !user || !conversation) return
-
-    const messageContent = newMessage
-    setNewMessage('') // Clear input immediately
+    const content = newMessage
+    setNewMessage('')
     setSending(true)
 
     try {
-      const { error } = await supabase
-        .from('chat_messages')
-        .insert({
-          conversation_id: conversation.id,
-          sender_id: user.id,
-          message_type: 'text',
-          content: messageContent,
-          is_read: false
-        })
-
+      const { error } = await supabase.from('chat_messages').insert({
+        conversation_id: conversation.id,
+        sender_id: user.id,
+        message_type: 'text',
+        content,
+        is_read: false
+      })
       if (error) throw error
-
-      // Update conversation timestamp
-      await supabase
-        .from('chat_conversations')
+      await supabase.from('chat_conversations')
         .update({ last_message_at: new Date().toISOString() })
         .eq('id', conversation.id)
-
     } catch (error) {
-      console.error('Error sending message:', error)
-      setNewMessage(messageContent) // Restore message if failed
-      alert('Failed to send message')
+      setNewMessage(content)
+      alert('Erreur d\'envoi')
     } finally {
       setSending(false)
     }
@@ -208,49 +185,28 @@ export default function ChatPage() {
 
     setUploading(true)
     try {
-      // 1. Correct Bucket Name: 'chat-images' (Public bucket)
       const fileExt = file.name.split('.').pop()
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
-      const filePath = `${fileName}` // Simple path
-
       const { error: uploadError } = await supabase.storage
-        .from('chat-images') // FIXED: Changed from 'chat-files' to 'chat-images'
-        .upload(filePath, file)
+        .from('chat-images')
+        .upload(fileName, file)
 
       if (uploadError) throw uploadError
 
-      // 2. Get Public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('chat-images')
-        .getPublicUrl(filePath)
+      const { data: { publicUrl } } = supabase.storage.from('chat-images').getPublicUrl(fileName)
 
-      // 3. Send Message
-      const messageType = file.type.startsWith('image/') ? 'image' : 'file'
-      
-      const { error: msgError } = await supabase
-        .from('chat_messages')
-        .insert({
-          conversation_id: conversation.id,
-          sender_id: user.id,
-          message_type: messageType,
-          file_url: publicUrl,
-          content: messageType === 'image' ? 'Image sent' : file.name,
-          is_read: false
-        })
-
-      if (msgError) throw msgError
-
-      await supabase
-        .from('chat_conversations')
-        .update({ last_message_at: new Date().toISOString() })
-        .eq('id', conversation.id)
-
+      await supabase.from('chat_messages').insert({
+        conversation_id: conversation.id,
+        sender_id: user.id,
+        message_type: 'image',
+        file_url: publicUrl,
+        content: 'Image envoyée',
+        is_read: false
+      })
     } catch (error: any) {
-      console.error('Error uploading file:', error)
-      alert(`Failed to upload file: ${error.message}`)
+      alert(`Erreur: ${error.message}`)
     } finally {
       setUploading(false)
-      if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
 
@@ -258,80 +214,78 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  const formatTime = (timestamp: string) => {
-    const date = new Date(timestamp)
-    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-  }
-
   return (
-    <div className={`min-h-screen ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'} flex flex-col`}>
+    <div className={`min-h-screen ${theme === 'dark' ? 'bg-gray-950 text-white' : 'bg-gray-50 text-gray-900'} flex flex-col`}>
       <Header />
 
-      <div className="container mx-auto px-4 py-8 flex-1 flex flex-col">
-        <div className={`${theme === 'dark' ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-xl flex-1 flex flex-col max-h-[calc(100vh-200px)]`}>
-          {/* Chat Header */}
-          <div className={`p-6 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
-            <h1 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-              Customer Support
-            </h1>
-            <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-              Chat with our support team
-            </p>
+      <main className="container mx-auto px-4 py-6 flex-1 flex flex-col max-w-4xl">
+        <div className={`flex-1 flex flex-col rounded-2xl shadow-2xl overflow-hidden border ${theme === 'dark' ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
+          
+          {/* Header du Chat */}
+          <div className={`p-4 border-b flex items-center justify-between ${theme === 'dark' ? 'bg-gray-900/50 border-gray-800' : 'bg-gray-50 border-gray-100'}`}>
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white shadow-lg">
+                <span className="font-bold">V</span>
+              </div>
+              <div>
+                <h2 className="font-bold text-lg leading-tight">Vertex Support</h2>
+                <div className="flex items-center text-xs text-green-500 font-medium">
+                  <span className="w-2 h-2 bg-green-500 rounded-full mr-1.5 animate-pulse"></span>
+                  Online & Ready to help
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Messages Area */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {/* Zone des Messages */}
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
             {loading ? (
-              <div className="text-center py-20">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+              <div className="h-full flex flex-col items-center justify-center space-y-4">
+                <Loader2 className="animate-spin text-blue-600" size={32} />
+                <p className="text-sm text-gray-500">Connecting to secure server...</p>
               </div>
             ) : messages.length === 0 ? (
-              <div className="text-center py-20">
-                <p className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                  No messages yet. Start a conversation!
-                </p>
+              <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-4">
+                <div className="bg-blue-100 dark:bg-blue-900/30 p-4 rounded-full">
+                  <Info className="text-blue-600" size={32} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg">Bienvenue sur le support</h3>
+                  <p className="text-sm text-gray-500 max-w-xs mx-auto">
+                    Posez vos questions ici. Nos experts Vertex Biolabs vous répondront dans les plus brefs délais.
+                  </p>
+                </div>
               </div>
             ) : (
               messages.map((message) => {
                 const isOwn = message.sender_id === user?.id
-                
                 return (
-                  <div 
-                    key={message.id}
-                    className={`flex ${isOwn ? 'justify-end' : 'justify-start'} animate-slide-up`}
-                  >
-                    <div className={`max-w-xs md:max-w-md ${isOwn ? 'order-2' : 'order-1'}`}>
-                      <div className={`rounded-2xl px-4 py-3 ${
+                  <div key={message.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`group max-w-[85%] md:max-w-[70%] ${isOwn ? 'items-end' : 'items-start'} flex flex-col`}>
+                      <div className={`rounded-2xl px-4 py-2.5 shadow-sm text-sm ${
                         isOwn 
-                          ? 'bg-blue-600 text-white' 
-                          : theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-200 text-gray-900'
+                          ? 'bg-blue-600 text-white rounded-br-none' 
+                          : theme === 'dark' ? 'bg-gray-800 text-gray-100 rounded-bl-none' : 'bg-gray-100 text-gray-800 rounded-bl-none'
                       }`}>
-                        {message.message_type === 'text' && (
-                          <p className="break-words">{message.content}</p>
-                        )}
-                        {message.message_type === 'image' && message.file_url && (
-                          <div>
-                            <img 
-                              src={message.file_url} 
-                              alt="Attachment" 
-                              className="rounded-lg mb-2 max-w-full cursor-pointer hover:opacity-90 transition"
-                           onClick={() => message.file_url && window.open(message.file_url, '_blank')}
-                            />
-                          </div>
-                        )}
-                        {message.message_type === 'voice' && message.file_url && (
-                          <div className="flex items-center space-x-2">
-                            <Mic size={16} />
-                            <span className="text-sm">Voice message</span>
-                          </div>
+                        {message.message_type === 'image' && message.file_url ? (
+                          <img 
+                            src={message.file_url} 
+                            alt="Sent" 
+                            className="rounded-lg max-h-60 cursor-pointer hover:opacity-95 transition"
+                            onClick={() => window.open(message.file_url!, '_blank')}
+                          />
+                        ) : (
+                          <p className="leading-relaxed whitespace-pre-wrap">{message.content}</p>
                         )}
                       </div>
-                      <div className={`flex items-center space-x-2 mt-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
-                        <span className={`text-xs ${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>
-                          {formatTime(message.created_at)}
+                      <div className="flex items-center mt-1.5 space-x-1.5 px-1">
+                        <span className="text-[10px] text-gray-500 font-medium">
+                          {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                         {isOwn && (
-                          message.is_read ? <CheckCheck size={14} className="text-blue-500" /> : <Check size={14} className="text-gray-400" />
+                          message.is_read 
+                            ? <CheckCheck size={14} className="text-blue-500" /> 
+                            : <Check size={14} className="text-gray-400" />
                         )}
                       </div>
                     </div>
@@ -340,25 +294,23 @@ export default function ChatPage() {
               })
             )}
 
-            {/* Typing Indicator */}
             {isTyping && (
-              <div className="flex justify-start animate-pulse">
-                <div className={`rounded-2xl px-4 py-3 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}>
+              <div className="flex justify-start">
+                <div className={`rounded-full px-4 py-2 ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'}`}>
                   <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></span>
+                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:0.2s]"></span>
+                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:0.4s]"></span>
                   </div>
                 </div>
               </div>
             )}
-            
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Area */}
-          <div className={`p-4 border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
-            <div className="flex items-center space-x-2">
+          {/* Zone de saisie */}
+          <div className={`p-4 border-t ${theme === 'dark' ? 'border-gray-800 bg-gray-900' : 'border-gray-100 bg-white'}`}>
+            <div className="flex items-end space-x-2">
               <input
                 type="file"
                 ref={fileInputRef}
@@ -369,44 +321,54 @@ export default function ChatPage() {
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={sending || uploading}
-                className={`p-3 ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'} rounded-lg transition`}
-                title="Attach file"
+                className={`p-3 rounded-xl transition-all ${
+                  theme === 'dark' ? 'bg-gray-800 hover:bg-gray-700 text-gray-400' : 'bg-gray-100 hover:bg-gray-200 text-gray-500'
+                }`}
               >
-                {uploading ? (
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-current"></div>
-                ) : (
-                  <Paperclip size={20} />
-                )}
+                {uploading ? <Loader2 size={20} className="animate-spin" /> : <Paperclip size={20} />}
               </button>
-              <input
-                type="text"
-                value={newMessage}
-                onChange={(e) => {
-                  setNewMessage(e.target.value)
-                  sendTypingEvent()
-                }}
-                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-                placeholder="Type your message..."
-                className={`flex-1 px-4 py-3 rounded-lg ${theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-100'} focus:outline-none focus:ring-2 focus:ring-blue-500`}
-              />
+
+              <div className={`flex-1 rounded-2xl border transition-all focus-within:ring-2 focus-within:ring-blue-500/50 ${
+                theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'
+              }`}>
+                <textarea
+                  value={newMessage}
+                  onChange={(e) => {
+                    setNewMessage(e.target.value)
+                    sendTypingEvent()
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      sendMessage()
+                    }
+                  }}
+                  placeholder="Écrivez votre message..."
+                  rows={1}
+                  className="w-full bg-transparent border-none focus:ring-0 p-3 text-sm resize-none max-h-32"
+                />
+              </div>
+
               <button
                 onClick={sendMessage}
                 disabled={sending || !newMessage.trim()}
-                className="p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`p-3 rounded-xl shadow-lg transition-all ${
+                  !newMessage.trim() || sending
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-800'
+                    : 'bg-blue-600 text-white hover:bg-blue-700 hover:scale-105 active:scale-95'
+                }`}
               >
-                {sending ? (
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                ) : (
-                  <Send size={20} />
-                )}
+                {sending ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
               </button>
             </div>
-            <p className={`text-xs mt-2 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>
-              Send your order reference code here for confirmation
-            </p>
+            <div className="mt-2 flex items-center justify-center space-x-1">
+               <span className="text-[10px] text-gray-400 font-medium italic">
+                 Vertex Biolabs encrypted support channel
+               </span>
+            </div>
           </div>
         </div>
-      </div>
+      </main>
 
       <Footer />
     </div>
