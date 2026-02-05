@@ -53,7 +53,7 @@ const ModernLandingPage = () => {
       provider: 'google',
       options: {
         // Redirection vers le handler de callback (nécessite le fichier app/auth/callback/route.ts)
-        redirectTo: `${siteUrl}/auth/callback`,
+        redirectTo: `${window.location.origin}/home`,
         queryParams: {
           access_type: 'offline',
           prompt: 'consent',
