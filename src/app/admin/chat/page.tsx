@@ -1,13 +1,14 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase, ChatConversation, ChatMessage } from '@/lib/supabase'
 import { useTheme } from '@/components/ThemeProvider'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
-import { Send, User, Check, CheckCheck, Search, Paperclip } from 'lucide-react'
+import { Send, User, Check, CheckCheck, Search, Paperclip, Loader2 } from 'lucide-react'
 
+// Force le rendu dynamique pour éviter les erreurs de build sur les pages admin
 export const dynamic = 'force-dynamic';
 
 interface ConversationWithUser extends ChatConversation {
@@ -19,7 +20,8 @@ interface ConversationWithUser extends ChatConversation {
   unread_count?: number
 }
 
-export default function AdminChatPage() {
+// 1. LE COMPOSANT DE LOGIQUE (Contient useSearchParams)
+function ChatContent() {
   const { theme } = useTheme()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -37,11 +39,33 @@ export default function AdminChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Vérification Auth & Admin
   useEffect(() => {
-    checkAdmin()
+    const init = async () => {
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
+      if (!currentUser) {
+        router.push('/login')
+        return
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', currentUser.id)
+        .single()
+
+      if (!profile?.is_admin) {
+        router.push('/home')
+        return
+      }
+
+      setUser(currentUser)
+      await loadConversations(currentUser.id)
+    }
+    init()
   }, [])
 
-  // Restauration de la conversation via URL
+  // Restauration via URL (ne s'exécute qu'une fois les conversations chargées)
   useEffect(() => {
     const chatIdFromUrl = searchParams.get('chatId')
     if (chatIdFromUrl && conversations.length > 0 && !selectedConversation) {
@@ -52,116 +76,20 @@ export default function AdminChatPage() {
     }
   }, [conversations, searchParams])
 
+  // Gestion de la conversation active
   useEffect(() => {
-    if (user && selectedConversation) {
-      // Mise à jour de l'URL
-      const newUrl = new URL(window.location.href)
-      newUrl.searchParams.set('chatId', selectedConversation.id)
-      window.history.pushState({}, '', newUrl)
+    if (!user || !selectedConversation) return
 
-      loadMessages()
-      const unsubscribe = subscribeToMessages()
-      markMessagesAsRead()
-      return () => {
-        if (unsubscribe) unsubscribe()
-      }
-    }
-  }, [user, selectedConversation])
+    // 1. Mise à jour URL sans rechargement
+    const newUrl = new URL(window.location.href)
+    newUrl.searchParams.set('chatId', selectedConversation.id)
+    window.history.pushState({}, '', newUrl)
 
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+    // 2. Chargement des messages
+    loadMessages()
+    markMessagesAsRead()
 
-  const checkAdmin = async () => {
-    const { data: { user: currentUser } } = await supabase.auth.getUser()
-    if (!currentUser) {
-      router.push('/login')
-      return
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('is_admin')
-      .eq('id', currentUser.id)
-      .single()
-
-    if (!profile?.is_admin) {
-      router.push('/home')
-      return
-    }
-
-    setUser(currentUser)
-    loadConversations(currentUser.id)
-  }
-
-  const loadConversations = async (currentUserId?: string) => {
-    const activeUserId = currentUserId || user?.id
-    if (!activeUserId) return
-
-    try {
-      const { data, error } = await supabase
-        .from('chat_conversations')
-        .select(`
-          *,
-          profiles!chat_conversations_user_id_fkey (full_name, email, avatar_url)
-        `)
-        .eq('status', 'active')
-        .order('last_message_at', { ascending: false })
-
-      if (error) throw error
-
-      const validData = (data || []).filter(conv => conv !== null && conv.id)
-
-      // Déduplication : Une seule conversation par utilisateur
-      const uniqueConversationsMap = new Map()
-      validData.forEach((conv: any) => {
-        if (conv.profiles && !uniqueConversationsMap.has(conv.user_id)) {
-          uniqueConversationsMap.set(conv.user_id, conv)
-        }
-      })
-      const uniqueConversations = Array.from(uniqueConversationsMap.values()) as ConversationWithUser[]
-
-      const conversationsWithUnread = await Promise.all(
-        uniqueConversations.map(async (conv) => {
-          const { count } = await supabase
-            .from('chat_messages')
-            .select('*', { count: 'exact', head: true })
-            .eq('conversation_id', conv.id)
-            .eq('is_read', false)
-            .neq('sender_id', activeUserId)
-
-          return { ...conv, unread_count: count || 0 }
-        })
-      )
-
-      setConversations(conversationsWithUnread)
-    } catch (error) {
-      console.error('Error loading conversations:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const loadMessages = async () => {
-    if (!selectedConversation) return
-
-    try {
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .select('*')
-        .eq('conversation_id', selectedConversation.id)
-        .order('created_at', { ascending: true })
-
-      if (error) throw error
-      setMessages(data || [])
-    } catch (error) {
-      console.error('Error loading messages:', error)
-    }
-  }
-
-  const subscribeToMessages = () => {
-    if (!selectedConversation || !user) return
-
+    // 3. Subscription Realtime
     const channel = supabase
       .channel(`admin-chat:${selectedConversation.id}`)
       .on(
@@ -173,11 +101,12 @@ export default function AdminChatPage() {
           filter: `conversation_id=eq.${selectedConversation.id}`
         },
         (payload) => {
-          const newMessage = payload.new as ChatMessage
-          setMessages((current) => [...current, newMessage])
-          if (newMessage.sender_id !== user.id) {
-            markMessageAsRead(newMessage.id)
+          const newMsg = payload.new as ChatMessage
+          setMessages((current) => [...current, newMsg])
+          if (newMsg.sender_id !== user.id) {
+            markMessageAsRead(newMsg.id)
           }
+          scrollToBottom()
         }
       )
       .subscribe()
@@ -185,63 +114,108 @@ export default function AdminChatPage() {
     return () => {
       supabase.removeChannel(channel)
     }
+  }, [selectedConversation, user])
+
+  // Scroll automatique lors de nouveaux messages
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages])
+
+  const loadConversations = async (userId: string) => {
+    try {
+      // Note: Assurez-vous que la relation 'profiles' est bien définie dans Supabase
+      const { data, error } = await supabase
+        .from('chat_conversations')
+        .select(`
+          *,
+          profiles!chat_conversations_user_id_fkey (full_name, email, avatar_url)
+        `)
+        .eq('status', 'active')
+        .order('last_message_at', { ascending: false })
+
+      if (error) throw error
+
+      const validData = (data || []).filter(conv => conv && conv.id)
+
+      // Gestion des doublons et calcul des non-lus
+      const processedConversations = await Promise.all(
+        validData.map(async (conv: any) => {
+          const { count } = await supabase
+            .from('chat_messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('conversation_id', conv.id)
+            .eq('is_read', false)
+            .neq('sender_id', userId)
+
+          return { ...conv, unread_count: count || 0 }
+        })
+      )
+
+      // Map pour unicité par user_id
+      const uniqueMap = new Map()
+      processedConversations.forEach(c => {
+        if (!uniqueMap.has(c.user_id)) uniqueMap.set(c.user_id, c)
+      })
+      
+      setConversations(Array.from(uniqueMap.values()))
+    } catch (error) {
+      console.error('Erreur chargement conversations:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadMessages = async () => {
+    if (!selectedConversation) return
+    const { data } = await supabase
+      .from('chat_messages')
+      .select('*')
+      .eq('conversation_id', selectedConversation.id)
+      .order('created_at', { ascending: true })
+    
+    if (data) setMessages(data)
   }
 
   const markMessagesAsRead = async () => {
     if (!selectedConversation || !user) return
-
-    try {
-      await supabase
-        .from('chat_messages')
-        .update({ is_read: true })
-        .eq('conversation_id', selectedConversation.id)
-        .neq('sender_id', user.id)
-        .eq('is_read', false)
-
-      loadConversations()
-    } catch (error) {
-      console.error('Error marking messages as read:', error)
-    }
+    await supabase
+      .from('chat_messages')
+      .update({ is_read: true })
+      .eq('conversation_id', selectedConversation.id)
+      .neq('sender_id', user.id)
+      .eq('is_read', false)
+      
+    // Mise à jour locale du compteur pour éviter de recharger toute la liste
+    setConversations(prev => prev.map(c => 
+      c.id === selectedConversation.id ? { ...c, unread_count: 0 } : c
+    ))
   }
 
   const markMessageAsRead = async (messageId: string) => {
-    try {
-      await supabase
-        .from('chat_messages')
-        .update({ is_read: true })
-        .eq('id', messageId)
-    } catch (error) {
-      console.error('Error marking message as read:', error)
-    }
+    await supabase.from('chat_messages').update({ is_read: true }).eq('id', messageId)
   }
 
-  // Upload d'image vers Supabase Storage
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return
     const file = e.target.files[0]
-    
     setUploading(true)
+
     try {
-      // Nom de fichier unique pour éviter les conflits
       const fileExt = file.name.split('.').pop()
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
-      const filePath = `${fileName}` // Pas de dossier imbriqué pour simplifier
-
       const { error: uploadError } = await supabase.storage
         .from('chat-images')
-        .upload(filePath, file)
+        .upload(fileName, file)
 
       if (uploadError) throw uploadError
 
       const { data: { publicUrl } } = supabase.storage
         .from('chat-images')
-        .getPublicUrl(filePath)
+        .getPublicUrl(fileName)
 
       await sendMessage(publicUrl, 'image')
-      
     } catch (error: any) {
-      console.error('Erreur upload:', error)
-      alert(`Erreur d'envoi image: ${error.message}`)
+      alert(`Erreur upload: ${error.message}`)
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -267,19 +241,19 @@ export default function AdminChatPage() {
 
       if (error) throw error
 
+      // Update timestamp conversation
       await supabase
         .from('chat_conversations')
-        .update({ 
-          last_message_at: new Date().toISOString(),
-          admin_id: user.id
-        })
+        .update({ last_message_at: new Date().toISOString(), admin_id: user.id })
         .eq('id', selectedConversation.id)
 
       if (type === 'text') setNewMessage('')
-      loadConversations() // Rafraîchir la liste pour remonter la conv en haut
+      
+      // On ne recharge pas toutes les conversations pour éviter le saut d'interface,
+      // on pourrait juste trier localement, mais loadConversations est plus sûr pour la synchro
+      loadConversations(user.id) 
     } catch (error) {
-      console.error('Error sending message:', error)
-      alert('Failed to send message')
+      console.error('Erreur envoi:', error)
     } finally {
       setSending(false)
     }
@@ -287,11 +261,6 @@ export default function AdminChatPage() {
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }
-
-  const formatTime = (timestamp: string) => {
-    const date = new Date(timestamp)
-    return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
   }
 
   const filteredConversations = conversations.filter(conv =>
@@ -304,69 +273,78 @@ export default function AdminChatPage() {
       <Header />
 
       <div className="container mx-auto px-4 py-8">
-        <h1 className={`text-4xl font-bold mb-8 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+        <h1 className={`text-3xl font-bold mb-6 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
           Support Client
         </h1>
 
-        <div className="grid lg:grid-cols-3 gap-6 h-[calc(100vh-250px)]">
-          {/* Liste des Conversations */}
-          <div className={`${theme === 'dark' ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg overflow-hidden flex flex-col`}>
-            <div className="p-4 border-b border-gray-700">
+        <div className="grid lg:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
+          
+          {/* COLONNE GAUCHE : LISTE CONVERSATIONS */}
+          <div className={`${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border rounded-xl shadow-sm overflow-hidden flex flex-col`}>
+            <div className="p-4 border-b border-inherit">
               <div className="relative">
-                <Search className={`absolute left-3 top-3 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`} size={20} />
+                <Search className="absolute left-3 top-3 text-gray-400" size={18} />
                 <input
                   type="text"
-                  placeholder="Rechercher..."
+                  placeholder="Rechercher un client..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className={`w-full pl-10 pr-4 py-2 rounded-lg ${theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-100'} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  className={`w-full pl-10 pr-4 py-2 rounded-lg text-sm ${
+                    theme === 'dark' ? 'bg-gray-700 text-white focus:bg-gray-600' : 'bg-gray-100 focus:bg-white'
+                  } focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors`}
                 />
               </div>
             </div>
 
             <div className="flex-1 overflow-y-auto">
               {loading ? (
-                <div className="text-center py-20">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                <div className="flex flex-col items-center justify-center h-40 space-y-3">
+                  <Loader2 className="animate-spin text-blue-500" size={24} />
+                  <p className="text-sm text-gray-500">Chargement des discussions...</p>
                 </div>
               ) : filteredConversations.length === 0 ? (
-                <div className="text-center py-20">
-                  <p className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                    Aucune conversation
-                  </p>
+                <div className="text-center py-10 px-4">
+                  <p className="text-gray-500 text-sm">Aucune conversation trouvée.</p>
                 </div>
               ) : (
                 filteredConversations.map((conv) => (
                   <div
                     key={conv.id}
                     onClick={() => setSelectedConversation(conv)}
-                    className={`p-4 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'} cursor-pointer hover:bg-opacity-50 transition ${
+                    className={`p-4 border-b border-inherit cursor-pointer transition-colors ${
                       selectedConversation?.id === conv.id
-                        ? theme === 'dark' ? 'bg-gray-700' : 'bg-blue-50'
-                        : theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
+                        ? theme === 'dark' ? 'bg-blue-900/30 border-l-4 border-l-blue-500' : 'bg-blue-50 border-l-4 border-l-blue-500'
+                        : theme === 'dark' ? 'hover:bg-gray-700/50' : 'hover:bg-gray-50'
                     }`}
                   >
                     <div className="flex items-center space-x-3">
-                      <div className="relative">
+                      <div className="relative flex-shrink-0">
                         {conv.profiles?.avatar_url ? (
-                          <img src={conv.profiles.avatar_url} alt="" className="w-12 h-12 rounded-full object-cover" />
+                          <img src={conv.profiles.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover" />
                         ) : (
-                          <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-white">
-                            <User size={24} />
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white">
+                            <User size={20} />
                           </div>
                         )}
                         {(conv.unread_count || 0) > 0 && (
-                          <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-white dark:border-gray-800">
                             {conv.unread_count}
-                          </div>
+                          </span>
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className={`font-semibold truncate ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                          {conv.profiles?.full_name || 'Inconnu'}
-                        </p>
-                        <p className={`text-sm truncate ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                          {conv.profiles?.email}
+                        <div className="flex justify-between items-baseline">
+                          <p className={`font-medium truncate text-sm ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>
+                            {conv.profiles?.full_name || 'Utilisateur Inconnu'}
+                          </p>
+                          {conv.last_message_at && (
+                            <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
+                              {new Date(conv.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' })}
+                            </span>
+                          )}
+                        </div>
+                        <p className={`text-xs truncate ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                           {conv.profiles?.email}
                         </p>
                       </div>
                     </div>
@@ -376,40 +354,63 @@ export default function AdminChatPage() {
             </div>
           </div>
 
-          {/* Zone de Chat */}
-          <div className={`lg:col-span-2 ${theme === 'dark' ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg flex flex-col`}>
+          {/* COLONNE DROITE : ZONE DE CHAT */}
+          <div className={`lg:col-span-2 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border rounded-xl shadow-sm flex flex-col overflow-hidden`}>
             {selectedConversation ? (
               <>
-                <div className={`p-6 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
-                  <h3 className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                    {selectedConversation.profiles?.full_name || 'Utilisateur'}
-                  </h3>
+                {/* Entête Chat */}
+                <div className={`p-4 border-b flex items-center justify-between ${theme === 'dark' ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'}`}>
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                      <span className="font-bold text-lg">
+                        {selectedConversation.profiles?.full_name?.charAt(0) || 'U'}
+                      </span>
+                    </div>
+                    <div>
+                      <h3 className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                        {selectedConversation.profiles?.full_name || 'Utilisateur'}
+                      </h3>
+                      <p className="text-xs text-gray-500">
+                        {selectedConversation.profiles?.email}
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                {/* Messages */}
+                <div className={`flex-1 overflow-y-auto p-6 space-y-4 ${theme === 'dark' ? 'bg-gray-900/50' : 'bg-gray-50/50'}`}>
                   {messages.map((message) => {
                     const isOwn = message.sender_id === user?.id
                     return (
                       <div key={message.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-xs md:max-w-md`}>
-                          <div className={`rounded-2xl px-4 py-3 ${
-                            isOwn ? 'bg-blue-600 text-white' : theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-200 text-gray-900'
+                        <div className={`max-w-[85%] md:max-w-[70%]`}>
+                          <div className={`rounded-2xl px-4 py-3 shadow-sm ${
+                            isOwn 
+                              ? 'bg-blue-600 text-white rounded-br-none' 
+                              : theme === 'dark' ? 'bg-gray-700 text-white rounded-bl-none' : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none'
                           }`}>
                             {message.message_type === 'image' && message.file_url ? (
-                              <img 
-                                src={message.file_url} 
-                                alt="Image" 
-                                className="rounded-lg max-h-60 object-contain cursor-pointer bg-black/10"
-                               onClick={() => message.file_url && window.open(message.file_url, '_blank')}
-                              />
+                              <div className="relative group">
+                                <img 
+                                  src={message.file_url} 
+                                  alt="Pièce jointe" 
+                                  className="rounded-lg max-h-64 object-contain cursor-pointer bg-black/20 hover:opacity-90 transition"
+                                  onClick={() => message.file_url && window.open(message.file_url, '_blank')}
+                                />
+                              </div>
                             ) : (
-                              <p className="break-words">{message.content}</p>
+                              <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
                             )}
                           </div>
-                          <div className={`flex items-center space-x-2 mt-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
-                            <span className="text-xs text-gray-500">{formatTime(message.created_at)}</span>
+                          
+                          <div className={`flex items-center space-x-1 mt-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                            <span className="text-[10px] text-gray-500">
+                              {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
                             {isOwn && (
-                              message.is_read ? <CheckCheck size={14} className="text-blue-500" /> : <Check size={14} className="text-gray-400" />
+                              message.is_read 
+                                ? <CheckCheck size={12} className="text-blue-500" /> 
+                                : <Check size={12} className="text-gray-400" />
                             )}
                           </div>
                         </div>
@@ -419,39 +420,69 @@ export default function AdminChatPage() {
                   <div ref={messagesEndRef} />
                 </div>
 
-                <div className={`p-4 border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+                {/* Input Zone */}
+                <div className={`p-4 border-t ${theme === 'dark' ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'}`}>
                   <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept="image/*" className="hidden" />
                   
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-end space-x-2">
                     <button
                       onClick={() => fileInputRef.current?.click()}
                       disabled={sending || uploading}
-                      className={`p-3 rounded-lg transition ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'}`}
+                      className={`p-3 rounded-xl transition-colors flex-shrink-0 ${
+                        theme === 'dark' 
+                          ? 'bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white' 
+                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700'
+                      }`}
+                      title="Joindre une image"
                     >
-                      {uploading ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-current"></div> : <Paperclip size={20} />}
+                      {uploading ? <Loader2 size={20} className="animate-spin" /> : <Paperclip size={20} />}
                     </button>
 
-                    <input
-                      type="text"
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage(undefined, 'text')}
-                      placeholder="Message..."
-                      className={`flex-1 px-4 py-3 rounded-lg ${theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-100'} focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                    />
+                    <div className={`flex-1 flex items-center rounded-xl px-4 py-2 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                      <textarea
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            sendMessage(undefined, 'text');
+                          }
+                        }}
+                        placeholder="Écrivez votre réponse..."
+                        className={`w-full bg-transparent border-none focus:ring-0 resize-none max-h-32 py-1 text-sm ${
+                          theme === 'dark' ? 'text-white placeholder-gray-400' : 'text-gray-900 placeholder-gray-500'
+                        }`}
+                        rows={1}
+                        style={{ minHeight: '24px' }}
+                      />
+                    </div>
+
                     <button
                       onClick={() => sendMessage(undefined, 'text')}
                       disabled={sending || (!newMessage.trim() && !uploading)}
-                      className="p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+                      className={`p-3 rounded-xl flex-shrink-0 shadow-sm transition-all ${
+                        sending || (!newMessage.trim() && !uploading)
+                          ? 'bg-gray-300 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500' 
+                          : 'bg-blue-600 text-white hover:bg-blue-700 hover:scale-105 active:scale-95'
+                      }`}
                     >
-                      {sending ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : <Send size={20} />}
+                      {sending ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
                     </button>
                   </div>
                 </div>
               </>
             ) : (
-              <div className="flex-1 flex items-center justify-center">
-                <p className="text-gray-500">Sélectionnez une conversation</p>
+              // État vide (Aucune conversation sélectionnée)
+              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center h-full">
+                <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 ${theme === 'dark' ? 'bg-gray-700' : 'bg-blue-50'}`}>
+                  <Search size={40} className="text-blue-400" />
+                </div>
+                <h3 className={`text-xl font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                  Sélectionnez une discussion
+                </h3>
+                <p className={`max-w-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                  Choisissez un client dans la liste de gauche pour voir l'historique et répondre.
+                </p>
               </div>
             )}
           </div>
@@ -459,5 +490,23 @@ export default function AdminChatPage() {
       </div>
       <Footer />
     </div>
+  )
+}
+
+// 2. LE COMPOSANT PRINCIPAL (Coquille Suspense pour Next.js)
+export default function AdminChatPage() {
+  const { theme } = useTheme()
+  
+  return (
+    <Suspense fallback={
+      <div className={`min-h-screen flex items-center justify-center ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'}`}>
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="animate-spin text-blue-600" size={40} />
+          <p className="text-gray-500 font-medium">Chargement du dashboard...</p>
+        </div>
+      </div>
+    }>
+      <ChatContent />
+    </Suspense>
   )
 }
