@@ -8,6 +8,8 @@ import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { Send, Image as ImageIcon, Mic, Paperclip, Check, CheckCheck } from 'lucide-react'
 
+export const dynamic = 'force-dynamic';
+
 export default function ChatPage() {
   const { theme } = useTheme()
   const router = useRouter()
