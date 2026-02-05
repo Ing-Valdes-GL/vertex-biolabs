@@ -8,6 +8,8 @@ import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { Send, User, Check, CheckCheck, Search, Paperclip } from 'lucide-react'
 
+export const dynamic = 'force-dynamic';
+
 interface ConversationWithUser extends ChatConversation {
   profiles?: {
     full_name: string
