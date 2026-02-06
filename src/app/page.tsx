@@ -124,7 +124,7 @@ const ModernLandingPage = () => {
               className="text-6xl md:text-8xl font-black mb-8 tracking-tighter"
               variants={itemVariants}
             >
-              Vertex <span className="text-blue-600">Biolabs</span>
+              Allu<span className="text-blue-600">vi</span>
             </motion.h1>
 
             <motion.p 
