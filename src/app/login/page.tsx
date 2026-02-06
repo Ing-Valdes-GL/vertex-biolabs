@@ -59,7 +59,7 @@ export default function LoginPage() {
           <div className="text-center mb-8">
             <div className="flex justify-center mb-4">
               <div className={`w-16 h-16 rounded-xl ${theme === 'dark' ? 'bg-blue-600' : 'bg-blue-500'} flex items-center justify-center text-white font-bold text-2xl shadow-lg`}>
-                VB
+                Alluvi
               </div>
             </div>
             <h2 className={`text-3xl font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
