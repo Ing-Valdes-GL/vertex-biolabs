@@ -94,7 +94,7 @@ export default function Header() {
               />
             </div>
             <span className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-              Vertex Biolabs
+              Alluvi
             </span>
           </Link>
 
