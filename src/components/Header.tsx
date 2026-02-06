@@ -88,9 +88,9 @@ export default function Header() {
               <Image 
                 src="/favicon.ico" 
                 alt="Logo" 
-                width={24} 
-                height={24} 
-                className="object-contain"
+                width={26} 
+                height={26} 
+                
               />
             </div>
             <span className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
