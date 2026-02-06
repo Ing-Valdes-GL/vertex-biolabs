@@ -225,10 +225,10 @@ export default function ChatPage() {
           <div className={`p-4 border-b flex items-center justify-between ${theme === 'dark' ? 'bg-gray-900/50 border-gray-800' : 'bg-gray-50 border-gray-100'}`}>
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white shadow-lg">
-                <span className="font-bold">V</span>
+                <span className="font-bold">U</span>
               </div>
               <div>
-                <h2 className="font-bold text-lg leading-tight">Vertex Support</h2>
+                <h2 className="font-bold text-lg leading-tight">Alluvi Support</h2>
                 <div className="flex items-center text-xs text-green-500 font-medium">
                   <span className="w-2 h-2 bg-green-500 rounded-full mr-1.5 animate-pulse"></span>
                   Online & Ready to help
@@ -252,7 +252,7 @@ export default function ChatPage() {
                 <div>
                   <h3 className="font-bold text-lg">Welcome to Support</h3>
                   <p className="text-sm text-gray-500 max-w-xs mx-auto">
-                    Ask your questions here. Our Vertex Biolabs experts will get back to you as soon as possible.
+                    Ask your questions here. Our Alluvi experts will get back to you as soon as possible.
                   </p>
                 </div>
               </div>
@@ -363,7 +363,7 @@ export default function ChatPage() {
             </div>
             <div className="mt-2 flex items-center justify-center space-x-1">
                <span className="text-[10px] text-gray-400 font-medium italic">
-                 Vertex Biolabs encrypted support channel
+                 Alluvi encrypted support channel
                </span>
             </div>
           </div>
