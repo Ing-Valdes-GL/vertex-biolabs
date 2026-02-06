@@ -84,13 +84,13 @@ export default function Header() {
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           <Link href="/" className="flex items-center space-x-3">
-           <div className={`w-12 h-12 rounded-lg ${theme === 'dark' ? 'bg-blue-600' : 'bg-blue-500'} flex items-center justify-center shadow-lg transition-transform hover:scale-105`}>
+           <div >
               <Image 
                 src="/favicon.ico" 
                 alt="Logo" 
-                width={26} 
-                height={26} 
-                
+                width={22} 
+                height={22} 
+                className="object-contain"
               />
             </div>
             <span className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
