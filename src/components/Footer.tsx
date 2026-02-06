@@ -7,7 +7,7 @@ export default function Footer() {
 
   // Texte du message automatique (encodé pour l'URL)
   const autoMessage = encodeURIComponent(
-    "Hello, I am contacting you from Vertex Biolabs. I would like to get more information about your pharmaceutical products, and about how to ship them."
+    "Hello, I am contacting you from Alluvi. I would like to get more information about your pharmaceutical products, and about how to ship them."
   );
 
   return (
@@ -17,11 +17,11 @@ export default function Footer() {
           
           <div className="text-center md:text-left">
             <h3 className="text-2xl font-bold mb-2 bg-gradient-to-r from-blue-400 to-green-400 bg-clip-text text-transparent">
-              Vertex Biolabs
+              Alluvi
             </h3>
             <p className="text-sm text-gray-400 italic">Precision & Quality in Pharmaceutical Products</p>
             <p className="text-xs text-gray-500 mt-1">Developed by Eng. Lagoung</p>
-            <p className="text-xs text-gray-500 mt-4 font-mono">© 2026 Vertex Biolabs. All rights reserved.</p>
+            <p className="text-xs text-gray-500 mt-4 font-mono">© 2026 Alluvi. All rights reserved.</p>
           </div>
 
           <div className="flex flex-col items-center space-y-4">
