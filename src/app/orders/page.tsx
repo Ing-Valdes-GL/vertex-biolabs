@@ -1,3 +1,6 @@
+
+
+
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -36,8 +39,7 @@ export default function ClientOrdersPage() {
           order_items (
             id,
             quantity,
-            unit_price,
-            subtotal,
+            price_at_time,
             products (
               name,
               main_image_url,
@@ -165,11 +167,8 @@ export default function ClientOrdersPage() {
                         <h3 className="font-semibold mb-4 text-sm uppercase tracking-wider text-gray-500">Order Items</h3>
                         <div className="space-y-4">
                           {order.order_items?.map((item: any) => {
-                            const unitPrice = typeof item.unit_price === 'number'
-                              ? item.unit_price
-                              : typeof item.subtotal === 'number' && item.quantity
-                                ? item.subtotal / item.quantity
-                                : item.products?.price ?? 0
+                            // Sécurité pour le prix : prix historique > prix actuel > 0
+                            const unitPrice = item.price_at_time || item.products?.price || 0;
                             return (
                               <div key={item.id} className="flex items-center gap-4">
                                 <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
@@ -184,7 +183,7 @@ export default function ClientOrdersPage() {
                                     {item.products?.name || 'Unknown Product'}
                                   </h4>
                                   <p className="text-sm text-gray-500">
-                                    Qty: {item.quantity} × £{(unitPrice).toFixed(2)}
+                                     Qty: {item.quantity} × £{(unitPrice).toFixed(2)}
                                   </p>
                                 </div>
                                 <div className="font-bold">
@@ -210,4 +209,4 @@ export default function ClientOrdersPage() {
       <Footer />
     </div>
   )
-}
+} //ameliore cette page sans changer sa structure, juste que le prix du produit au moment de la commande ne s'appelle pas du totu ca affiche 0.00, rassure toi aussi queca soit compilable avec vercel
