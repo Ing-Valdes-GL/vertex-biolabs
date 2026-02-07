@@ -188,7 +188,7 @@ export default function ClientOrdersPage() {
         £{(item.quantity * item.price_at_time).toFixed(2)}
       </div>
     </div>
-  ))}
+  )}
 </div>
                             </div>
                           ))}
