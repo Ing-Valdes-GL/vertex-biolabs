@@ -145,7 +145,7 @@ export default function ClientOrdersPage() {
                   <div className="flex items-center justify-between md:justify-end gap-6">
                     <div className="text-right">
                       <span className="block text-xs text-gray-500">Total Amount</span>
-                      <span className="text-xl font-bold text-blue-500">${order.total_amount.toFixed(2)}</span>
+                      <span className="text-xl font-bold text-blue-500">£{order.total_amount.toFixed(2)}</span>
                     </div>
                     <div className={`p-2 rounded-full ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
                       {expandedOrder === order.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
@@ -179,7 +179,7 @@ export default function ClientOrdersPage() {
                                   {item.products?.name || 'Unknown Product'}
                                 </h4>
                                 <p className="text-sm text-gray-500">
-                                  Qty: {item.quantity} × ${item.price_at_time.toFixed(2)}
+                                  Qty: {item.quantity} × £{item.price_at_time.toFixed(2)}
                                 </p>
                               </div>
                               <div className="font-bold">
