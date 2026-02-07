@@ -39,7 +39,8 @@ export default function ClientOrdersPage() {
             price_at_time,
             products (
               name,
-              main_image_url
+              main_image_url,
+              price
             )
           )
         `)
@@ -123,7 +124,6 @@ export default function ClientOrdersPage() {
                     : 'bg-white border-gray-200 hover:border-blue-300'
                 } shadow-sm hover:shadow-md`}
               >
-                {/* Order Header */}
                 <div 
                   onClick={() => toggleOrder(order.id)}
                   className="p-6 cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4"
@@ -137,14 +137,14 @@ export default function ClientOrdersPage() {
                       </span>
                     </div>
                     <div className="text-sm text-gray-500">
-                      Placed on {new Date(order.created_at).toLocaleDateString()} at {new Date(order.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                      Placed on {new Date(order.created_at).toLocaleDateString()}
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between md:justify-end gap-6">
+                  <div className="flex items-center gap-6">
                     <div className="text-right">
                       <span className="block text-xs text-gray-500">Total Amount</span>
-                      <span className="text-xl font-bold text-blue-500">£{order.total_amount.toFixed(2)}</span>
+                      <span className="text-xl font-bold text-blue-500">£{Number(order.total_amount).toFixed(2)}</span>
                     </div>
                     <div className={`p-2 rounded-full ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
                       {expandedOrder === order.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
@@ -152,7 +152,6 @@ export default function ClientOrdersPage() {
                   </div>
                 </div>
 
-                {/* Order Details */}
                 <AnimatePresence>
                   {expandedOrder === order.id && (
                     <motion.div
@@ -164,36 +163,34 @@ export default function ClientOrdersPage() {
                       <div className="p-6">
                         <h3 className="font-semibold mb-4 text-sm uppercase tracking-wider text-gray-500">Order Items</h3>
                         <div className="space-y-4">
-                          {order.order_items?.map((item: any) => (
-                            <div key={item.id} className="flex items-center gap-4">
-                              <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
-                                <img 
-                                  src={item.products?.main_image_url} 
-                                  alt={item.products?.name} 
-                                  className="w-full h-full object-cover"
-                                />
+                          {order.order_items?.map((item: any) => {
+                            // Sécurité pour le prix : prix historique > prix actuel > 0
+                            const unitPrice = item.price_at_time || item.products?.price || 0;
+                            return (
+                              <div key={item.id} className="flex items-center gap-4">
+                                <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
+                                  <img 
+                                    src={item.products?.main_image_url} 
+                                    alt={item.products?.name} 
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                                <div className="flex-1">
+                                  <h4 className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                                    {item.products?.name || 'Unknown Product'}
+                                  </h4>
+                                  <p className="text-sm text-gray-500">
+                                    Qty: {item.quantity} × £{Number(unitPrice).toFixed(2)}
+                                  </p>
+                                </div>
+                                <div className="font-bold">
+                                  £{(item.quantity * unitPrice).toFixed(2)}
+                                </div>
                               </div>
-                            <div className="flex-1">
-  <h4 className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-    {item.products?.name || 'Unknown Product'}
-  </h4>
-  <p className="text-sm text-gray-500">
-    {/* On cherche le prix historique, sinon le prix actuel du produit */}
-    Qty: {item.quantity} × £{(item.price_at_time || item.products?.price || 0).toFixed(2)}
-  </p>
-</div>
-<div className="font-bold">
-  {/* Calcul du sous-total sécurisé */}
-  £{(item.quantity * (item.price_at_time || item.products?.price || 0)).toFixed(2)}
-</div>
-                              <div className="font-bold">
-                                £{(item.quantity * item.price_at_time).toFixed(2)}
-                              </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
-                        
-                        <div className="mt-6 pt-4 border-t border-dashed border-gray-500/20 text-xs text-gray-500 text-center">
+                        <div className="mt-6 pt-4 border-t border-dashed border-gray-500/20 text-xs text-gray-500 text-center italic">
                            Thank you for shopping with Alluvi
                         </div>
                       </div>
