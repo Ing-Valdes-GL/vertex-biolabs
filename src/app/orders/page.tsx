@@ -178,9 +178,9 @@ export default function ClientOrdersPage() {
                                 <h4 className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                                   {item.products?.name || 'Unknown Product'}
                                 </h4>
-                                <p className="text-sm text-gray-500">
-                                  Qty: {item.quantity} × £{item.products.price(2)}
-                                </p>
+                               <p className="text-sm text-gray-500">
+                                    Qty: {item.quantity} × £{item.products?.price?.toFixed(2)}
+                               </p>
                               </div>
                               <div className="font-bold">
                                 £{order.total_amount.toFixed(2)}
