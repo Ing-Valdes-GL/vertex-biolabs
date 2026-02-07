@@ -6,7 +6,7 @@ const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = {
   title: 'Alluvi - Quality Pharmaceutical Products',
-  description: 'Alluvi develops and evaluates premium peptides, supplements',
+  description: 'Alluvi develops and evaluates premium peptides and supplements',
   icons: { icon: '/favicon.ico' },
 }
 
