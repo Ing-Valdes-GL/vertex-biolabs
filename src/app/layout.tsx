@@ -15,25 +15,3 @@ export const metadata: Metadata = {
 }
 
 export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  return (
-    <html lang="fr" suppressHydrationWarning>
-      <body className={inter.className}>
-        {/* ThemeProvider configuré pour correspondre à l'utilisation de class (dark:...) 
-          dans Tailwind et éviter les flashs de couleur au chargement.
-        */}
-        <ThemeProvider 
-          attribute="class" 
-          defaultTheme="system" 
-          enableSystem
-          disableTransitionOnChange
-        >
-          {children}
-        </ThemeProvider>
-      </body>
-    </html>
-  )
-}
