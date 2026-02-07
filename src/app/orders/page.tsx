@@ -173,14 +173,19 @@ export default function ClientOrdersPage() {
                                   className="w-full h-full object-cover"
                                 />
                               </div>
-                              <div className="flex-1">
-                                <h4 className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                                  {item.products?.name || 'Unknown Product'}
-                                </h4>
-                                <p className="text-sm text-gray-500">
-                                  Qty: {item.quantity} × £{Number(item.price_at_time).toFixed(2)}
-                                </p>
-                              </div>
+                            <div className="flex-1">
+  <h4 className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+    {item.products?.name || 'Unknown Product'}
+  </h4>
+  <p className="text-sm text-gray-500">
+    {/* On cherche le prix historique, sinon le prix actuel du produit */}
+    Qty: {item.quantity} × £{(item.price_at_time || item.products?.price || 0).toFixed(2)}
+  </p>
+</div>
+<div className="font-bold">
+  {/* Calcul du sous-total sécurisé */}
+  £{(item.quantity * (item.price_at_time || item.products?.price || 0)).toFixed(2)}
+</div>
                               <div className="font-bold">
                                 £{(item.quantity * item.price_at_time).toFixed(2)}
                               </div>
