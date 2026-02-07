@@ -88,8 +88,8 @@ export default function Header() {
               <Image 
                 src="/favicon.ico" 
                 alt="Logo" 
-                width={22} 
-                height={22} 
+                width={28} 
+                height={28} 
                 className="object-contain"
               />
             </div>
