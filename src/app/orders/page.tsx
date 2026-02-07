@@ -179,7 +179,7 @@ export default function ClientOrdersPage() {
                                   {item.products?.name || 'Unknown Product'}
                                 </h4>
                                 <p className="text-sm text-gray-500">
-                                  Qty: {item.quantity} × £{item.products.price.toFixed(2)}
+                                  Qty: {item.quantity} × £{item.products.price(2)}
                                 </p>
                               </div>
                               <div className="font-bold">
