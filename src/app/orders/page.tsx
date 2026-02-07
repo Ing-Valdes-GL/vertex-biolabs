@@ -29,7 +29,6 @@ export default function ClientOrdersPage() {
     }
 
     try {
-      // On récupère la commande ET les articles ET les infos produits liées
       const { data, error } = await supabase
         .from('orders')
         .select(`
@@ -124,7 +123,7 @@ export default function ClientOrdersPage() {
                     : 'bg-white border-gray-200 hover:border-blue-300'
                 } shadow-sm hover:shadow-md`}
               >
-                {/* Order Header (Clickable) */}
+                {/* Order Header */}
                 <div 
                   onClick={() => toggleOrder(order.id)}
                   className="p-6 cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4"
@@ -153,7 +152,7 @@ export default function ClientOrdersPage() {
                   </div>
                 </div>
 
-                {/* Order Details (Expandable) */}
+                {/* Order Details */}
                 <AnimatePresence>
                   {expandedOrder === order.id && (
                     <motion.div
@@ -165,36 +164,30 @@ export default function ClientOrdersPage() {
                       <div className="p-6">
                         <h3 className="font-semibold mb-4 text-sm uppercase tracking-wider text-gray-500">Order Items</h3>
                         <div className="space-y-4">
-  {order.order_items?.map((item: any) => (
-    <div key={item.id} className="flex items-center gap-4">
-      <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
-        <img 
-          src={item.products?.main_image_url} 
-          alt={item.products?.name} 
-          className="w-full h-full object-cover"
-        />
-      </div>
-      <div className="flex-1">
-        <h4 className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-          {item.products?.name || 'Unknown Product'}
-        </h4>
-        <p className="text-sm text-gray-500">
-          {/* Utilisation de price_at_time récupéré dans la requête */}
-          Qty: {item.quantity} × £{Number(item.price_at_time).toFixed(2)}
-        </p>
-      </div>
-      <div className="font-bold">
-        {/* Calcul du sous-total pour cet article précis */}
-        £{(item.quantity * item.price_at_time).toFixed(2)}
-      </div>
-    </div>
-  )}
-</div>
+                          {order.order_items?.map((item: any) => (
+                            <div key={item.id} className="flex items-center gap-4">
+                              <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
+                                <img 
+                                  src={item.products?.main_image_url} 
+                                  alt={item.products?.name} 
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                              <div className="flex-1">
+                                <h4 className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                                  {item.products?.name || 'Unknown Product'}
+                                </h4>
+                                <p className="text-sm text-gray-500">
+                                  Qty: {item.quantity} × £{Number(item.price_at_time).toFixed(2)}
+                                </p>
+                              </div>
+                              <div className="font-bold">
+                                £{(item.quantity * item.price_at_time).toFixed(2)}
+                              </div>
                             </div>
                           ))}
                         </div>
                         
-                        {/* Footer info (Shipping, etc could go here) */}
                         <div className="mt-6 pt-4 border-t border-dashed border-gray-500/20 text-xs text-gray-500 text-center">
                            Thank you for shopping with Alluvi
                         </div>
