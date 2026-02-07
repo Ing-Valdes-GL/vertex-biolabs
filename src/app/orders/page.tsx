@@ -36,7 +36,8 @@ export default function ClientOrdersPage() {
           order_items (
             id,
             quantity,
-            price_at_time,
+            unit_price,
+            subtotal,
             products (
               name,
               main_image_url,
@@ -164,8 +165,11 @@ export default function ClientOrdersPage() {
                         <h3 className="font-semibold mb-4 text-sm uppercase tracking-wider text-gray-500">Order Items</h3>
                         <div className="space-y-4">
                           {order.order_items?.map((item: any) => {
-                            // Sécurité pour le prix : prix historique > prix actuel > 0
-                            const unitPrice = item.price_at_time || item.products?.price || 0;
+                            const unitPrice = typeof item.unit_price === 'number'
+                              ? item.unit_price
+                              : typeof item.subtotal === 'number' && item.quantity
+                                ? item.subtotal / item.quantity
+                                : item.products?.price ?? 0
                             return (
                               <div key={item.id} className="flex items-center gap-4">
                                 <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
