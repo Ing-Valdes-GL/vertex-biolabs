@@ -165,26 +165,31 @@ export default function ClientOrdersPage() {
                       <div className="p-6">
                         <h3 className="font-semibold mb-4 text-sm uppercase tracking-wider text-gray-500">Order Items</h3>
                         <div className="space-y-4">
-                          {order.order_items?.map((item: any) => (
-                            <div key={item.id} className="flex items-center gap-4">
-                              <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
-                                <img 
-                                  src={item.products?.main_image_url} 
-                                  alt={item.products?.name} 
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                              <div className="flex-1">
-                                <h4 className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                                  {item.products?.name || 'Unknown Product'}
-                                </h4>
-                               <p className="text-sm text-gray-500">
-                                    Qty: {item.quantity} × £{item.products?.price?.toFixed(2)}
-                               </p>
-                              </div>
-                              <div className="font-bold">
-                                £{order.total_amount.toFixed(2)}
-                              </div>
+  {order.order_items?.map((item: any) => (
+    <div key={item.id} className="flex items-center gap-4">
+      <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
+        <img 
+          src={item.products?.main_image_url} 
+          alt={item.products?.name} 
+          className="w-full h-full object-cover"
+        />
+      </div>
+      <div className="flex-1">
+        <h4 className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+          {item.products?.name || 'Unknown Product'}
+        </h4>
+        <p className="text-sm text-gray-500">
+          {/* Utilisation de price_at_time récupéré dans la requête */}
+          Qty: {item.quantity} × £{Number(item.price_at_time).toFixed(2)}
+        </p>
+      </div>
+      <div className="font-bold">
+        {/* Calcul du sous-total pour cet article précis */}
+        £{(item.quantity * item.price_at_time).toFixed(2)}
+      </div>
+    </div>
+  ))}
+</div>
                             </div>
                           ))}
                         </div>
