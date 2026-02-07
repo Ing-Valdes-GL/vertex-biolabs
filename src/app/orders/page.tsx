@@ -183,7 +183,7 @@ export default function ClientOrdersPage() {
                                 </p>
                               </div>
                               <div className="font-bold">
-                                £{(item.quantity * item.price_at_time).toFixed(2)}
+                                £{order.total_amount.toFixed(2)}
                               </div>
                             </div>
                           ))}
