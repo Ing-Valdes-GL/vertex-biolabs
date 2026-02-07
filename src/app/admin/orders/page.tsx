@@ -165,7 +165,7 @@ export default function AdminDashboard() {
 
           <div className={`${theme === 'dark' ? 'bg-gray-800' : 'bg-white'} p-6 rounded-xl shadow-lg`}>
             <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-purple-100 text-purple-600 rounded-lg"><£ size={24} /></div>
+              <div className="p-3 bg-purple-100 text-purple-600 rounded-lg"><DollarSign size={24} /></div>
               <span className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Revenue</span>
             </div>
             {/* Affichage du revenu corrigé */}
