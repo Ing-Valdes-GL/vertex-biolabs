@@ -5,8 +5,8 @@ import { ThemeProvider } from '@/components/ThemeProvider'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = {
-  title: 'Vertex Biolabs - Quality Pharmaceutical Products',
-  description: 'Your trusted source for quality pharmaceutical products',
+  title: 'Alluvi - Quality Pharmaceutical Products',
+  description: 'Alluvi develops and evaluates premium peptides, supplements',
   icons: { icon: '/favicon.ico' },
 }
 
