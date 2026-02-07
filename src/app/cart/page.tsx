@@ -282,11 +282,11 @@ export default function CartPage() {
                         <div className="flex items-center space-x-2">
                           {item.products.has_promotion && (
                             <span className="text-gray-400 line-through text-sm">
-                              ${item.products.price.toFixed(2)}
+                              £{item.products.price.toFixed(2)}
                             </span>
                           )}
                           <span className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                            ${finalPrice.toFixed(2)}
+                            £{finalPrice.toFixed(2)}
                           </span>
                           {item.products.has_promotion && (
                             <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs font-bold">
@@ -322,7 +322,7 @@ export default function CartPage() {
                     <div className={`mt-4 pt-4 border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'} flex justify-between items-center`}>
                       <span className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Subtotal:</span>
                       <span className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                        ${calculateItemPrice(item).toFixed(2)}
+                        £{calculateItemPrice(item).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -340,7 +340,7 @@ export default function CartPage() {
                 <div className="space-y-3 mb-6">
                   <div className={`flex justify-between ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                     <span>Items ({cartItems.reduce((sum, item) => sum + item.quantity, 0)}):</span>
-                    <span>${calculateTotal().toFixed(2)}</span>
+                    <span>£{calculateTotal().toFixed(2)}</span>
                   </div>
                   <div className={`flex justify-between ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                     <span>Shipping:</span>
@@ -348,7 +348,7 @@ export default function CartPage() {
                   </div>
                   <div className={`pt-3 border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'} flex justify-between text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                     <span>Total:</span>
-                    <span>${calculateTotal().toFixed(2)}</span>
+                    <span>£{calculateTotal().toFixed(2)}</span>
                   </div>
                 </div>
 
@@ -361,7 +361,7 @@ export default function CartPage() {
                 </button>
 
                 <p className={`text-xs text-center mt-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                  You will receive a reference code to send to our support team
+                  DO NOT CLICK TWICE! you will receive a reference code to send to our support team.
                 </p>
               </div>
             </div>
